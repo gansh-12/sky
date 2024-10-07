@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
+<body>
+  <div class="container">
+    <form onsubmit="handleFormSubmit(event)">
+      <label for="expense">Choose expense amount (Rs.): </label>
+      <input type="number" name="expense" id="expense" />
+      <label for="description">Choose description: </label>
+      <input type="text" name="description" id="description" />
+      <label for="category" class="form-label">Choose a category: </label>
+      <select class="form-select" name="category" id="category">
+        <option>Fuel</option>
+        <option>Food</option>
+        <option>Electricity</option>
+        <option>Movie</option>
+      </select>
+      <button type="submit">Add Expense</button>
+    </form>
+    <ul></ul>
+  </div>
+</body>
+<script src="Expense_tracker_app.js"></script>
+</html>
+
+
+//Javascript
+// Define the handleFormSubmit function
+function handleFormSubmit(event) {
+  // Prevent the form from submitting
+  event.preventDefault();
+
+  // Get the unordered list element
+  const expenseList = document.querySelector("ul");
+
+  const expenseInput = event.target.elements.expense;
+  const descriptionInput = event.target.elements.description;
+  const categoryInput = document.getElementById("category").value;
+
+  // Create a object from the form data
+  const expensedata = {
+    expense: expenseInput.value,
+    description: descriptionInput.value,
+    category: categoryInput,
+  };
+
+  // Store the object in local storage
+  localStorage.setItem(expensedata.description, JSON.stringify(expensedata));
+
+  // Create a delete button for the expense
+  const deleteBtn = document.createElement("button");
+  const deleteBtnText = document.createTextNode("Delete Expense");
+  deleteBtn.classList.add("delete-btn");
+  deleteBtn.appendChild(deleteBtnText);
+
+  // Create a edit button for the expense
+  const editBtn = document.createElement("button");
+  const editBtnText = document.createTextNode("Edit Expense");
+  editBtn.classList.add("edit-btn");
+  editBtn.appendChild(editBtnText);
+
+  // Add the expense to the unordered list with the delete button
+  const listItem = document.createElement("li");
+  listItem.textContent = `${expensedata.expense} - ${expensedata.description} - ${expensedata.category}`;
+  listItem.appendChild(deleteBtn);
+  listItem.appendChild(editBtn);
+  expenseList.appendChild(listItem);
+
+  // Reset the form
+  //event.target.reset();
+}
+
+// Add an event listener to the document to handle delete button clicks
+document.addEventListener("click", function (event) {
+  if (event.target.classList.contains("delete-btn")) {
+    // Remove the expense from local storage
+    const expense = event.target.parentElement.textContent.split(" - ")[1];
+    localStorage.removeItem(expense);
+
+    // Remove the expense from the unordered list
+    const listItem = event.target.parentElement;
+    listItem.remove();
+  }
+
+  // Add an event listener to the document to handle edit button clicks
+  if (event.target.classList.contains("edit-btn")) {
+    
+    // Get the expense details from the DOM
+    const listItem = event.target.parentElement;
+    const [expense, description, category] = listItem.textContent.split(" - ");
+
+    // Remove the expense from local storage   
+    localStorage.removeItem(expense);
+
+    // Remove the expense from the unordered list
+    listItem.remove();
+
+    // Populate the input fields with the existing values
+    const expenseInput = document.querySelector('input[name="expense"]');
+    const descriptionInput = document.querySelector('input[name="description"]');
+    const categoryInput = document.querySelector('input[name="category"]');    
+    expenseInput.value = expense;
+    descriptionInput.value = description;
+    categoryInput = category;
+
+  }
+
+});
+
+//module.exports=handleFormSubmit;
