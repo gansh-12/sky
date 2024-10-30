@@ -1,0 +1,205 @@
+//HTML
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
+
+<body>
+  <div class="container">
+    <h1 style="text-align: center;">Feedback System</h1>
+    <form onsubmit="handleFormSubmit(event)">
+      <h2>Overall Ratings</h2>
+      <ul id="ratingCounts">
+        <li>* <span id="rating1">0</span></li>
+        <li>** <span id="rating2">0</span></li>
+        <li>*** <span id="rating3">0</span></li>
+        <li>**** <span id="rating4">0</span></li>
+        <li>***** <span id="rating5">0</span></li>
+      </ul>
+      <br><br><br>
+      <h2>Feedback Form</h2>
+      <label for="name">Enter Your Name: </label>
+      <input type="text" name="name" id="name" />
+      <label for="ratingCategory" class="form-label">Choose Rating: </label>
+      <select class="form-select" name="ratingCategory" id="ratingCategory">
+        <option>1</option>
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+        <option>5</option>
+      </select>
+      <button type="submit">SUBMIT</button>
+    </form>
+    <br><br><br>
+    <h2>ALL FEEDBACKS</h2>
+    <rl></rl>
+  </div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.5.1/axios.min.js"></script>
+<script src="Feedback.js"></script>
+
+</html>
+
+
+
+
+
+//Javascript
+// Initialize rating counts
+const ratingCounts = {
+  1: 0,
+  2: 0,
+  3: 0,
+  4: 0,
+  5: 0,
+};
+
+// Load existing counts from crudcrud
+function loadRatingCounts() {
+  axios
+    .get("https://crudcrud.com/api/9888bd26f419463da38e45b3a0f6a808/feedbackData")
+    .then((response) => {
+      response.data.forEach((item) => {
+        ratingCounts[item.ratingCategory]++;
+        displayUserOnScreen(item);
+      });
+      localStorage.setItem("ratingCounts", JSON.stringify(ratingCounts));
+      updateRatingDisplay();
+    })
+    .catch((error) => console.log(error));
+}
+
+// Update the rating display
+function updateRatingDisplay() {
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById(`rating${i}`).textContent = ratingCounts[i];
+  }
+}
+
+// Call this function to initialize counts
+loadRatingCounts();
+
+// Define the handleFormSubmit function
+function handleFormSubmit(event) {
+  // Prevent the form from submitting
+  event.preventDefault();
+
+  const nameInput = event.target.elements.name;
+  const ratingInput = parseInt(document.getElementById("ratingCategory").value);
+
+  // Create a object from the form data
+  const ratingdata = {
+    name: nameInput.value,
+    ratingCategory: ratingInput,
+  };
+
+  // Store the object in CrudCRUD
+  axios
+    .post("https://crudcrud.com/api/9888bd26f419463da38e45b3a0f6a808/feedbackData", ratingdata)
+    .then((response) => {
+      ratingCounts[ratingInput]++;
+      localStorage.setItem("ratingCounts", JSON.stringify(ratingCounts));
+      updateRatingDisplay();
+      displayUserOnScreen(response.data); // Add feedback to the screen
+    })
+    .catch((error) => console.log(error));
+
+  // Reset the input fields
+  nameInput.value = "";
+}
+
+// Display user feedback on screen
+function displayUserOnScreen(feedback) {
+  const ratingList = document.querySelector("rl");
+  const listItem = document.createElement("li");
+  listItem.setAttribute("data-id", feedback._id); // Store the ID for later use
+  listItem.textContent = `${feedback.name} ${feedback.ratingCategory}`;
+
+
+  // Create a delete button for the feedback
+  const deleteBtn = document.createElement("button");
+  const deleteBtnText = document.createTextNode("DELETE");
+  deleteBtn.classList.add("delete-btn");
+  deleteBtn.appendChild(deleteBtnText);
+  listItem.appendChild(deleteBtn);
+
+  // Create a edit button for the feedback
+  const editBtn = document.createElement("button");
+  const editBtnText = document.createTextNode("Edit");
+  editBtn.classList.add("edit-btn");
+  editBtn.appendChild(editBtnText);
+  listItem.appendChild(editBtn);
+
+  ratingList.appendChild(listItem);
+}
+
+// Add an event listener to the document to handle delete button clicks
+document.addEventListener("click", function (event) {
+  if (event.target.classList.contains("delete-btn")) {
+    // Get the rating from the list item
+    const listItem = event.target.parentElement;
+    const id = listItem.getAttribute("data-id");
+    const rating = listItem.textContent.split(" ")[1];
+
+    // Decrement the rating count
+    ratingCounts[parseInt(rating)]--;
+    localStorage.setItem("ratingCounts", JSON.stringify(ratingCounts));
+    updateRatingDisplay();
+
+    // Remove the feedback from CrudCRUD
+    axios
+      .delete(`https://crudcrud.com/api/9888bd26f419463da38e45b3a0f6a808/feedbackData/${id}`)
+      .then(() => {
+        // Remove the feedback from the unordered list
+        listItem.remove();
+      })
+      .catch((error) => console.log(error));
+  }
+
+  // Add an event listener to the document to handle edit button clicks
+  if (event.target.classList.contains("edit-btn")) {
+
+    const listItem = event.target.parentElement;
+    const id = listItem.getAttribute("data-id");
+    const [name, ratingCategory] = listItem.textContent.split(" ");
+
+    // Decrement the count for the existing rating
+    ratingCounts[parseInt(ratingCategory)]--;
+    localStorage.setItem("ratingCounts", JSON.stringify(ratingCounts));
+    updateRatingDisplay();
+   
+    // Populate the input fields with the existing values
+    const nameInput = document.querySelector('input[name="name"]');
+    const ratingSelect = document.getElementById("ratingCategory");    
+    nameInput.value = name;
+    ratingSelect.value = ratingCategory;
+
+    // Remove the feedback from the unordered list
+    listItem.remove();
+
+    // Update on submission
+    document.getElementById("submitButton").onclick = function () {
+      const updatedRatingInput = parseInt(ratingSelect.value);
+      const updatedData = { name: nameInput.value, ratingCategory: updatedRatingInput };
+
+      axios
+        .put(`https://crudcrud.com/api/9888bd26f419463da38e45b3a0f6a808/feedbackData/${id}`, updatedData)
+        .then(() => {
+          ratingCounts[updatedRatingInput]++;
+          localStorage.setItem("ratingCounts", JSON.stringify(ratingCounts));
+          updateRatingDisplay();
+          displayUserOnScreen({ ...updatedData, _id: id }); // Update display
+        })
+        .catch((error) => console.log(error));
+    };
+
+  }
+
+});
+
+//module.exports=handleFormSubmit;
