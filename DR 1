@@ -1,4 +1,4 @@
-//admin.js
+//controllers/admin.js
 const Product = require('../models/product');
 
 exports.getAddProduct = (req, res, next) => {
@@ -33,14 +33,14 @@ exports.getProducts = (req, res, next) => {
 
 
 
-//errors.js
+//controllers/errors.js
 exports.get404 = (req, res, next) => {
   res.status(404).render('404', { pageTitle: 'Page Not Found', path: '/404' });
 };
 
 
 
-//shop.js
+//controllers/shop.js
 const Product = require('../models/product');
 
 exports.getProducts = (req, res, next) => {
@@ -85,8 +85,11 @@ exports.getCheckout = (req, res, next) => {
 };
 
 
+//data/product.json
+[{"id": "123245", "title": "expressdemo", "imageUrl": "https://www.publicdomainpictures.net/pictures/10000/velka/1-1210009435EGmE.jpg", "description": "This is an awesome book!", "price": "19"}]
 
-//product.js
+
+//models/product.js
 const fs = require('fs');
 const path = require('path');
 
@@ -129,7 +132,7 @@ module.exports = class Product {
 };
 
 
-//form.css
+//public/css/form.css
 .form-control {
   margin: 1rem 0;
 }
@@ -156,7 +159,7 @@ module.exports = class Product {
 
 
 
-//main.css
+//public/css/main.css
 @import url('https://fonts.googleapis.com/css?family=Open+Sans:400,700');
 
 * {
@@ -364,7 +367,7 @@ form {
 
 
 
-//product.css
+//public/css/product.css
 .product-form {
     width: 20rem;
     max-width: 90%;
@@ -394,7 +397,7 @@ form {
 }
 
 
-//main.js
+//public/js/main.js
 const backdrop = document.querySelector('.backdrop');
 const sideDrawer = document.querySelector('.mobile-nav');
 const menuToggle = document.querySelector('#side-menu-toggle');
@@ -414,7 +417,7 @@ menuToggle.addEventListener('click', menuToggleClickHandler);
 
 
 
-//admin.js
+//routes/admin.js
 const path = require('path');
 
 const express = require('express');
@@ -436,7 +439,7 @@ module.exports = router;
 
 
 
-//shop.js
+//routes/shop.js
 const path = require('path');
 
 const express = require('express');
@@ -458,40 +461,13 @@ router.get('/checkout', shopController.getCheckout);
 module.exports = router;
 
 
-//path.js
+//util/path.js
 const path = require('path');
 
 module.exports = path.dirname(process.mainModule.filename);
 
 
-//app.js
-const path = require('path');
-
-const express = require('express');
-const bodyParser = require('body-parser');
-
-const errorController = require('./controllers/error');
-
-const app = express();
-
-app.set('view engine', 'ejs');
-app.set('views', 'views');
-
-const adminRoutes = require('./routes/admin');
-const shopRoutes = require('./routes/shop');
-
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.use('/admin', adminRoutes);
-app.use(shopRoutes);
-
-app.use(errorController.get404);
-
-app.listen(3000);
-
-
-//add-product.ejs
+//views/admin/add-product.ejs
 <%- include('../includes/head.ejs') %>
     <link rel="stylesheet" href="/css/forms.css">
     <link rel="stylesheet" href="/css/product.css">
@@ -525,7 +501,12 @@ app.listen(3000);
 <%- include('../includes/end.ejs') %>
 
 
-//product.ejs
+
+//views/admin/edit-product.ejs
+//empty
+
+
+//views/admin/product.ejs
 <%- include('../includes/head.ejs') %>
     <link rel="stylesheet" href="/css/product.css">
     </head>
@@ -572,14 +553,15 @@ app.listen(3000);
 
 
 
-//end.ejs
+//views/includes/end.ejs
 <script src="/js/main.js"></script>
 </body>
 
 </html>
 
 
-//head.ejs
+
+//views/includes/head.ejs
 <!DOCTYPE html>
 <html lang="en">
 
@@ -591,7 +573,8 @@ app.listen(3000);
     <link rel="stylesheet" href="/css/main.css">
 
 
-//navigation.ejs
+
+//views/includes/navigation.ejs
 <div class="backdrop"></div>
 <header class="main-header">
     <button id="side-menu-toggle">Menu</button>
@@ -647,16 +630,23 @@ app.listen(3000);
 </nav>
 
 
-//cart.ejs
+
+//views/shop/cart.ejs
 <%- include('../includes/head.ejs') %>
     </head>
 
     <body>
         <%- include('../includes/navigation.ejs') %>
         <%- include('../includes/end.ejs') %>
+        
 
 
-//index.ejs
+//views/shop/checkout.ejs
+//empty
+
+
+
+//views/shop/index.ejs
 <%- include('../includes/head.ejs') %>
     <link rel="stylesheet" href="/css/product.css">
 </head>
@@ -694,7 +684,8 @@ app.listen(3000);
 
 
 
-//orders.ejs
+
+//views/shop/orders.ejs
 <%- include('../includes/head.ejs') %>
     </head>
 
@@ -704,9 +695,33 @@ app.listen(3000);
             <h1>Nothing there!</h1>
         </main>
         <%- include('../includes/end.ejs') %>
+        
 
 
-//product-list.ejs
+
+//views/shop/product-detail.ejs
+<%- include('../includes/head.ejs') %>
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+        <main class="centered">
+            <h1><%= product.title %></h1>
+            <hr>
+            <div>
+                <img src="<%= product.imageUrl %>" alt="<%= product.title %>">
+            </div>
+            <h2><%= product.price %></h2>
+            <p><%= product.description %></p>
+            <form action="/cart" method="POST">
+                <button class="btn" type="submit">Add to Cart</button>
+            </form>
+        </main>
+        <%- include('../includes/end.ejs') %>
+
+
+
+//views/shop/product-list.ejs
 <%- include('../includes/head.ejs') %>
     <link rel="stylesheet" href="/css/product.css">
     </head>
@@ -736,6 +751,7 @@ app.listen(3000);
                                     </p>
                                 </div>
                                 <div class="card__actions">
+                                    <a href="/products/<%= product.id %>" class="btn">Details</a>
                                     <form action="/add-to-cart" method="POST">
                                         <button class="btn">Add to Cart</button>
                                     </form>
@@ -750,7 +766,9 @@ app.listen(3000);
             <%- include('../includes/end.ejs') %>
 
 
-//404.ejs
+
+
+//views/404.ejs
 <%- include('includes/head.ejs') %>
 </head>
 
@@ -759,5 +777,34 @@ app.listen(3000);
     <h1>Page Not Found!</h1>
 
 <%- include('includes/end.ejs') %>
+
+
+
+
+//app.js
+const path = require('path');
+
+const express = require('express');
+const bodyParser = require('body-parser');
+
+const errorController = require('./controllers/error');
+
+const app = express();
+
+app.set('view engine', 'ejs');
+app.set('views', 'views');
+
+const adminRoutes = require('./routes/admin');
+const shopRoutes = require('./routes/shop');
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/admin', adminRoutes);
+app.use(shopRoutes);
+
+app.use(errorController.get404);
+
+app.listen(3000);
 
 
