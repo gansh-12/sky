@@ -1,0 +1,907 @@
+const Product = require('../models/product');
+
+exports.getAddProduct = (req, res, next) => {
+  res.render('admin/edit-product', {
+    pageTitle: 'Add Product',
+    path: '/admin/add-product',
+    editing: false
+  });
+};
+
+exports.postAddProduct = (req, res, next) => {
+  const title = req.body.title;
+  const imageUrl = req.body.imageUrl;
+  const price = req.body.price;
+  const description = req.body.description;
+  const product = new Product(title, imageUrl, description, price);
+  product.save();
+  res.redirect('/');
+};
+
+exports.getEditProduct = (req, res, next) => {
+  const editMode = req.query.edit;
+  if (!editMode) {
+    return res.redirect('/');
+  }
+  const prodId = req.params.productId;
+  Product.findById(prodId, product => {
+    if (!product) {
+      return res.redirect('/');
+    }
+    res.render('admin/edit-product', {
+      pageTitle: 'Edit Product',
+      path: '/admin/edit-product',
+      editing: editMode,
+      product: product
+    });
+  });
+};
+
+exports.getProducts = (req, res, next) => {
+  Product.fetchAll(products => {
+    res.render('admin/products', {
+      prods: products,
+      pageTitle: 'Admin Products',
+      path: '/admin/products'
+    });
+  });
+};
+
+exports.get404 = (req, res, next) => {
+  res.status(404).render('404', { pageTitle: 'Page Not Found', path: '/404' });
+};
+
+
+const Product = require('../models/product');
+const Cart = require('../models/cart');
+
+exports.getProducts = (req, res, next) => {
+  Product.fetchAll(products => {
+    res.render('shop/product-list', {
+      prods: products,
+      pageTitle: 'All Products',
+      path: '/products'
+    });
+  });
+};
+
+exports.getProduct = (req, res, next) => {
+  const prodId = req.params.productId;
+  Product.findById(prodId, product => {
+    res.render('shop/product-detail', {
+      product: product,
+      pageTitle: product.title,
+      path: '/products'
+    });
+  });
+};
+
+exports.getIndex = (req, res, next) => {
+  Product.fetchAll(products => {
+    res.render('shop/index', {
+      prods: products,
+      pageTitle: 'Shop',
+      path: '/'
+    });
+  });
+};
+
+exports.getCart = (req, res, next) => {
+  res.render('shop/cart', {
+    path: '/cart',
+    pageTitle: 'Your Cart'
+  });
+};
+
+exports.postCart = (req, res, next) => {
+  const prodId = req.body.productId;
+  Product.findById(prodId, product => {
+    Cart.addProduct(prodId, product.price);
+  });
+  res.redirect('/cart');
+};
+
+exports.getOrders = (req, res, next) => {
+  res.render('shop/orders', {
+    path: '/orders',
+    pageTitle: 'Your Orders'
+  });
+};
+
+exports.getCheckout = (req, res, next) => {
+  res.render('shop/checkout', {
+    path: '/checkout',
+    pageTitle: 'Checkout'
+  });
+};
+
+
+https://www.publicdomainpictures.net/pictures/10000/velka/1-1210009435EGmE.jpg
+
+
+data:image/jpeg;base64,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
+
+0.558673316244021
+
+
+const fs = require('fs');
+const path = require('path');
+
+const p = path.join(
+  path.dirname(process.mainModule.filename),
+  'data',
+  'cart.json'
+);
+
+module.exports = class Cart {
+  static addProduct(id, productPrice) {
+    // Fetch the previous cart
+    fs.readFile(p, (err, fileContent) => {
+      let cart = { products: [], totalPrice: 0 };
+      if (!err) {
+        cart = JSON.parse(fileContent);
+      }
+      // Analyze the cart => Find existing product
+      const existingProductIndex = cart.products.findIndex(
+        prod => prod.id === id
+      );
+      const existingProduct = cart.products[existingProductIndex];
+      let updatedProduct;
+      // Add new product/ increase quantity
+      if (existingProduct) {
+        updatedProduct = { ...existingProduct };
+        updatedProduct.qty = updatedProduct.qty + 1;
+        cart.products = [...cart.products];
+        cart.products[existingProductIndex] = updatedProduct;
+      } else {
+        updatedProduct = { id: id, qty: 1 };
+        cart.products = [...cart.products, updatedProduct];
+      }
+      cart.totalPrice = cart.totalPrice + +productPrice;
+      fs.writeFile(p, JSON.stringify(cart), err => {
+        console.log(err);
+      });
+    });
+  }
+};
+
+
+const fs = require('fs');
+const path = require('path');
+
+const p = path.join(
+  path.dirname(process.mainModule.filename),
+  'data',
+  'products.json'
+);
+
+const getProductsFromFile = cb => {
+  fs.readFile(p, (err, fileContent) => {
+    if (err) {
+      cb([]);
+    } else {
+      cb(JSON.parse(fileContent));
+    }
+  });
+};
+
+module.exports = class Product {
+  constructor(title, imageUrl, description, price) {
+    this.title = title;
+    this.imageUrl = imageUrl;
+    this.description = description;
+    this.price = price;
+  }
+
+  save() {
+    this.id = Math.random().toString();
+    getProductsFromFile(products => {
+      products.push(this);
+      fs.writeFile(p, JSON.stringify(products), err => {
+        console.log(err);
+      });
+    });
+  }
+
+  static fetchAll(cb) {
+    getProductsFromFile(cb);
+  }
+
+  static findById(id, cb) {
+    getProductsFromFile(products => {
+      const product = products.find(p => p.id === id);
+      cb(product);
+    });
+  }
+};
+
+
+.form-control {
+  margin: 1rem 0;
+}
+
+.form-control label,
+.form-control input,
+.form-control textarea {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+.form-control input,
+.form-control textarea {
+  border: 1px solid #a1a1a1;
+  font: inherit;
+  border-radius: 2px;
+}
+
+.form-control input:focus,
+.form-control textarea:focus {
+  outline-color: #00695c;
+}
+
+
+
+@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,700');
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  padding: 0;
+  margin: 0;
+  font-family: 'Open Sans', sans-serif;
+}
+
+main {
+  padding: 1rem;
+  margin: auto;
+}
+
+form {
+  display: inline;
+}
+
+.centered {
+  text-align: center;
+}
+
+.main-header {
+  width: 100%;
+  height: 3.5rem;
+  background-color: #00695c;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.main-header__nav {
+  height: 100%;
+  display: none;
+  align-items: center;
+}
+
+.main-header__item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+
+.main-header__item {
+  margin: 0 1rem;
+  padding: 0;
+}
+
+.main-header__item a {
+  text-decoration: none;
+  color: white;
+}
+
+.main-header__item a:hover,
+.main-header__item a:active,
+.main-header__item a.active {
+  color: #ffeb3b;
+}
+
+.mobile-nav {
+  width: 30rem;
+  height: 100vh;
+  max-width: 90%;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background: white;
+  z-index: 10;
+  padding: 2rem 1rem 1rem 2rem;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-out;
+}
+
+.mobile-nav.open {
+  transform: translateX(0);
+}
+
+.mobile-nav__item-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.mobile-nav__item {
+  margin: 1rem;
+  padding: 0;
+}
+
+.mobile-nav__item a {
+  text-decoration: none;
+  color: black;
+  font-size: 1.5rem;
+  padding: 0.5rem 2rem;
+}
+
+.mobile-nav__item a:active,
+.mobile-nav__item a:hover,
+.mobile-nav__item a.active {
+  background: #00695c;
+  color: white;
+  border-radius: 3px;
+}
+
+#side-menu-toggle {
+  border: 1px solid white;
+  font: inherit;
+  padding: 0.5rem;
+  display: block;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+}
+
+#side-menu-toggle:focus {
+  outline: none;
+}
+
+#side-menu-toggle:active,
+#side-menu-toggle:hover {
+  color: #ffeb3b;
+  border-color: #ffeb3b;
+}
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 5;
+  display: none;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: stretch;
+}
+
+.card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+}
+
+.card__header,
+.card__content {
+  padding: 1rem;
+}
+
+.card__header h1,
+.card__content h1,
+.card__content h2,
+.card__content p {
+  margin: 0;
+}
+
+.card__image {
+  width: 100%;
+}
+
+.card__image img {
+  width: 100%;
+}
+
+.card__actions {
+  padding: 1rem;
+  text-align: center;
+}
+
+.card__actions button,
+.card__actions a {
+  margin: 0 0.25rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.25rem 1rem;
+  text-decoration: none;
+  font: inherit;
+  border: 1px solid #00695c;
+  color: #00695c;
+  background: white;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.btn:hover,
+.btn:active {
+  background-color: #00695c;
+  color: white;
+}
+
+@media (min-width: 768px) {
+  .main-header__nav {
+    display: flex;
+  }
+
+  #side-menu-toggle {
+    display: none;
+  }
+}
+
+
+
+.product-form {
+    width: 20rem;
+    max-width: 90%;
+    margin: auto;
+    display: block;
+}
+
+.product-item {
+    width: 20rem;
+    max-width: 95%;
+    margin: 1rem;
+}
+
+.product__title {
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.product__price {
+    text-align: center;
+    color: #4d4d4d;
+    margin-bottom: 0.5rem;
+}
+
+.product__description {
+    text-align: center;
+}
+
+
+
+
+const backdrop = document.querySelector('.backdrop');
+const sideDrawer = document.querySelector('.mobile-nav');
+const menuToggle = document.querySelector('#side-menu-toggle');
+
+function backdropClickHandler() {
+  backdrop.style.display = 'none';
+  sideDrawer.classList.remove('open');
+}
+
+function menuToggleClickHandler() {
+  backdrop.style.display = 'block';
+  sideDrawer.classList.add('open');
+}
+
+backdrop.addEventListener('click', backdropClickHandler);
+menuToggle.addEventListener('click', menuToggleClickHandler);
+
+
+const path = require('path');
+
+const express = require('express');
+
+const adminController = require('../controllers/admin');
+
+const router = express.Router();
+
+// /admin/add-product => GET
+router.get('/add-product', adminController.getAddProduct);
+
+// /admin/products => GET
+router.get('/products', adminController.getProducts);
+
+// /admin/add-product => POST
+router.post('/add-product', adminController.postAddProduct);
+
+router.get('/edit-product/:productId', adminController.getEditProduct);
+
+module.exports = router;
+
+
+
+const path = require('path');
+
+const express = require('express');
+
+const shopController = require('../controllers/shop');
+
+const router = express.Router();
+
+router.get('/', shopController.getIndex);
+
+router.get('/products', shopController.getProducts);
+
+router.get('/products/:productId', shopController.getProduct);
+
+router.get('/cart', shopController.getCart);
+
+router.post('/cart', shopController.postCart);
+
+router.get('/orders', shopController.getOrders);
+
+router.get('/checkout', shopController.getCheckout);
+
+module.exports = router;
+
+
+
+const path = require('path');
+
+module.exports = path.dirname(process.mainModule.filename);
+
+
+
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/product.css">
+</head>
+
+<body>
+   <%- include('../includes/navigation.ejs') %>
+
+    <main>
+        <form class="product-form" action="/admin/<% if (editing) { %>edit-product<% } else { %>add-product<% } %>" method="POST">
+            <div class="form-control">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" value="<% if (editing) { %><%= product.title %><% } %>">
+            </div>
+            <div class="form-control">
+                <label for="imageUrl">Image URL</label>
+                <input type="text" name="imageUrl" id="imageUrl" value="<% if (editing) { %><%= product.imageUrl %><% } %>">
+            </div>
+            <div class="form-control">
+                <label for="price">Price</label>
+                <input type="number" name="price" id="price" step="0.01" value="<% if (editing) { %><%= product.price %><% } %>">
+            </div>
+            <div class="form-control">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" rows="5"><% if (editing) { %><%= product.description %><% } %></textarea>
+            </div>
+
+            <button class="btn" type="submit"><% if (editing) { %>Update Product<% } else { %>Add Product<% } %></button>
+        </form>
+    </main>
+<%- include('../includes/end.ejs') %>
+
+
+
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/product.css">
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+
+            <main>
+                <% if (prods.length > 0) { %>
+                    <div class="grid">
+                        <% for (let product of prods) { %>
+                            <article class="card product-item">
+                                <header class="card__header">
+                                    <h1 class="product__title">
+                                        <%= product.title %>
+                                    </h1>
+                                </header>
+                                <div class="card__image">
+                                    <img src="<%= product.imageUrl %>" alt="<%= product.title %>">
+                                </div>
+                                <div class="card__content">
+                                    <h2 class="product__price">$
+                                        <%= product.price %>
+                                    </h2>
+                                    <p class="product__description">
+                                        <%= product.description %>
+                                    </p>
+                                </div>
+                                <div class="card__actions">
+                                    <a href="/admin/edit-product" class="btn">Edit</a>
+                                    <form action="/admin/delete-product" method="POST">
+                                        <button class="btn" type="submit">Delete</button>
+                                    </form>
+
+                                </div>
+                            </article>
+                            <% } %>
+                    </div>
+                    <% } else { %>
+                        <h1>No Products Found!</h1>
+                        <% } %>
+            </main>
+            <%- include('../includes/end.ejs') %>
+
+
+<form action="/cart" method="post">
+    <button class="btn" type="submit">Add to Cart</button>
+    <input type="hidden" name="productId" value="<%= product.id %>">
+</form>
+
+
+<script src="/js/main.js"></script>
+</body>
+
+</html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title><%= pageTitle %></title>
+    <link rel="stylesheet" href="/css/main.css">
+
+
+
+<div class="backdrop"></div>
+<header class="main-header">
+    <button id="side-menu-toggle">Menu</button>
+    <nav class="main-header__nav">
+        <ul class="main-header__item-list">
+            <li class="main-header__item">
+                <a class="<%= path === '/' ? 'active' : '' %>" href="/">Shop</a>
+            </li>
+            <li class="main-header__item">
+                <a class="<%= path === '/products' ? 'active' : '' %>" href="/products">Products</a>
+            </li>
+            <li class="main-header__item">
+                <a class="<%= path === '/cart' ? 'active' : '' %>" href="/cart">Cart</a>
+            </li>
+            <li class="main-header__item">
+                <a class="<%= path === '/orders' ? 'active' : '' %>" href="/orders">Orders</a>
+            </li>
+            <li class="main-header__item">
+                <a class="<%= path === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
+                </a>
+            </li>
+            <li class="main-header__item">
+                <a class="<%= path === '/admin/products' ? 'active' : '' %>" href="/admin/products">Admin Products
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+
+<nav class="mobile-nav">
+        <ul class="mobile-nav__item-list">
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/' ? 'active' : '' %>" href="/">Shop</a>
+                </li>
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/products' ? 'active' : '' %>" href="/products">Products</a>
+                </li>
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/cart' ? 'active' : '' %>" href="/cart">Cart</a>
+                </li>
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/orders' ? 'active' : '' %>" href="/orders">Orders</a>
+                </li>
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
+                    </a>
+                </li>
+                <li class="mobile-nav__item">
+                    <a class="<%= path === '/admin/products' ? 'active' : '' %>" href="/admin/products">Admin Products
+                    </a>
+                </li>
+            </ul>
+</nav>
+
+
+<%- include('../includes/head.ejs') %>
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+        <%- include('../includes/end.ejs') %>
+
+
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/product.css">
+</head>
+
+<body>
+    <%- include('../includes/navigation.ejs') %>
+
+    <main>
+        <% if (prods.length > 0) { %>
+            <div class="grid">
+                <% for (let product of prods) { %>
+                    <article class="card product-item">
+                        <header class="card__header">
+                            <h1 class="product__title"><%= product.title %></h1>
+                        </header>
+                        <div class="card__image">
+                            <img src="<%= product.imageUrl %>"
+                                alt="<%= product.title %>">
+                        </div>
+                        <div class="card__content">
+                            <h2 class="product__price">$<%= product.price %></h2>
+                            <p class="product__description"><%= product.description %></p>
+                        </div>
+                        <div class="card__actions">
+                            <%- include('../includes/add-to-cart.ejs', {product: product}) %>
+                        </div>
+                    </article>
+                <% } %>
+            </div>
+        <% } else { %>
+            <h1>No Products Found!</h1>
+        <% } %>
+    </main>
+<%- include('../includes/end.ejs') %>
+
+
+<%- include('../includes/head.ejs') %>
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+        <main>
+            <h1>Nothing there!</h1>
+        </main>
+        <%- include('../includes/end.ejs') %>
+
+<%- include('../includes/head.ejs') %>
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+        <main class="centered">
+            <h1><%= product.title %></h1>
+            <hr>
+            <div>
+                <img src="<%= product.imageUrl %>" alt="<%= product.title %>">
+            </div>
+            <h2><%= product.price %></h2>
+            <p><%= product.description %></p>
+            <%- include('../includes/add-to-cart.ejs') %>
+        </main>
+        <%- include('../includes/end.ejs') %>
+
+
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/product.css">
+    </head>
+
+    <body>
+        <%- include('../includes/navigation.ejs') %>
+
+            <main>
+                <% if (prods.length > 0) { %>
+                    <div class="grid">
+                        <% for (let product of prods) { %>
+                            <article class="card product-item">
+                                <header class="card__header">
+                                    <h1 class="product__title">
+                                        <%= product.title %>
+                                    </h1>
+                                </header>
+                                <div class="card__image">
+                                    <img src="<%= product.imageUrl %>" alt="<%= product.title %>">
+                                </div>
+                                <div class="card__content">
+                                    <h2 class="product__price">$
+                                        <%= product.price %>
+                                    </h2>
+                                    <p class="product__description">
+                                        <%= product.description %>
+                                    </p>
+                                </div>
+                                <div class="card__actions">
+                                    <a href="/products/<%= product.id %>" class="btn">Details</a>
+                                    <%- include('../includes/add-to-cart.ejs', {product: product}) %>
+                                </div>
+                            </article>
+                            <% } %>
+                    </div>
+                    <% } else { %>
+                        <h1>No Products Found!</h1>
+                        <% } %>
+            </main>
+            <%- include('../includes/end.ejs') %>
+
+<%- include('includes/head.ejs') %>
+</head>
+
+<body>
+    <%- include('includes/navigation.ejs') %>
+    <h1>Page Not Found!</h1>
+
+<%- include('includes/end.ejs') %>
+
+
+
+const path = require('path');
+
+const express = require('express');
+const bodyParser = require('body-parser');
+
+const errorController = require('./controllers/error');
+
+const app = express();
+
+app.set('view engine', 'ejs');
+app.set('views', 'views');
+
+const adminRoutes = require('./routes/admin');
+const shopRoutes = require('./routes/shop');
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/admin', adminRoutes);
+app.use(shopRoutes);
+
+app.use(errorController.get404);
+
+app.listen(3000);
+
+
+
+
+{
+  "name": "nodejs-complete-guide",
+  "version": "1.0.0",
+  "description": "Complete Node.js Guide",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js",
+    "start-server": "node app.js"
+  },
+  "author": "Maximilian Schwarzmüller",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^1.18.3"
+  },
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "ejs": "^2.6.1",
+    "express": "^4.16.3",
+    "express-handlebars": "^3.0.0",
+    "pug": "^2.0.3"
+  }
+}
+
+
+
+
+
+{"products":[{"id":"0.558673316244021","qty":2}],"totalPrice":41.98}
+
+
+
+
+[{"id":"123245","title":"A Book","imageUrl":"https://www.publicdomainpictures.net/pictures/10000/velka/1-1210009435EGmE.jpg","description":"This is an awesome book!","price":"19"},{"title":"Another Product","imageUrl":"data:image/jpeg;base64,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","description":"Another very amazing product!","price":"20.99","id":"0.558673316244021"}]
+
+
+
+
