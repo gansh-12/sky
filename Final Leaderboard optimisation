@@ -1,0 +1,779 @@
+//controller/expenseController.js
+const Expense=require('../models/expense');
+const User=require('../models/user');
+
+const addExpense = async (req, res)=> {
+    const {amount, description, category, userId}=req.body;
+    console.log("Received expense data: ",req.body);
+    try {
+        if (!amount||!description||!category) {
+            return res.status(400).json({message: "All fields are required"});
+        }
+        const expense=await Expense.create({amount,description, category, userId});
+        const user=await User.findByPk(userId);
+        if (user) {
+            const newTotalExpense=user.totalExpense+parseInt(amount);
+            await user.update({totalExpense:newTotalExpense});
+        }
+        res.status(201).json(expense);
+    } catch (error) {
+        console.log("Error in addExpense: ",error.message);
+        res.status(500).json({message:error.message});
+    }
+}
+
+const getExpenses=async (req, res)=> {
+    try {
+        const {userId}=req.query;
+        const expenses=await Expense.findAll({where:{userId}});
+        res.status(200).json(expenses);
+    } catch (error) {
+        res.status(500).json({message:error.message});
+    }
+}
+
+
+const deleteExpense = async (req, res)=> {
+    try {
+        const {id}=req.params;
+        const expense=await Expense.findByPk(id);
+        if (!expense) return res.status(404).json({message:"Expense not found"});
+
+        const user=await User.findByPk(expense.userId);
+        if (user) {
+            const newTotalExpense=user.totalExpense-expense.amount;
+            await user.update({totalExpense:newTotalExpense});
+        }
+
+        await Expense.destroy({where:{id}});
+        res.status(200).json({message: "Expense deleted successfully"});
+    } catch (error) {
+        console.log("Error in deleteExpense:", error.message);
+        res.status(500).json({message:error.message});
+    }
+}
+
+module.exports={
+    addExpense,
+    getExpenses,
+    deleteExpense
+}
+
+
+// controllers/paymentController.js
+const { createOrder, getPaymentStatus } = require("../services/cashfreeServices");
+const Payment = require("../models/payment");
+const User=require("../models/user");
+const path = require("path");
+
+exports.getPaymentPage=(req,res)=> {
+    res.sendFile(path.join(__dirname,"../views/index.html"));
+}
+
+exports.processPayment = async (req, res) => {
+  const orderId = "ORDER-" + Date.now();
+  const orderAmount = 2000;
+  const orderCurrency = "INR";
+  const customerID = req.body.userId||"1";
+  const customerPhone = "9999999999";
+
+  try {
+    // Create order on Cashfree and get the payment session ID
+    const paymentSessionId = await createOrder(
+      orderId,
+      orderAmount,
+      orderCurrency,
+      customerID,
+      customerPhone
+    );
+
+    // Save payment details in DB
+    await Payment.create({
+      orderId,
+      paymentSessionId,
+      orderAmount,
+      orderCurrency,
+      paymentStatus: "Pending",
+      userId:customerID
+    });
+
+    res.json({ paymentSessionId, orderId });
+  } catch (error) {
+    console.error("Error processing payment:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updatePaymentStatus=async (req,res) => {
+  const {orderId,status,userId}=req.body;
+
+  try {
+    await Payment.update({paymentStatus:status},{where:{orderId}});
+
+    if (status==="SUCCESS") {
+      await User.update({isPremiumUser:true},{where:{id:userId}});
+    }
+
+    res.json({message:"Payment status updated successfully"});
+  } catch (error) {
+    console.error("Error updating payment status:",error.message);
+    res.status(500).json({error:error.message});
+  }
+}
+
+exports.getPaymentStatus=async (req,res) => {
+  const {paymentSessionId}=req.params;
+  try {
+    const status=await getPaymentStatus(paymentSessionId);
+    res.json(status);
+  } catch (error) {
+    console.error("Error fetching payment status:",error.message);
+    res.status(500).json({error:error.message});
+  }
+}
+
+exports.paymentCallback=async (req,res)=> {
+  try {
+    const {order_id}=req.query;
+
+    if (!order_id) {
+      return res.send("<script>alert('Invalid callback data'); window.location.href='/';</script>");
+    }
+
+    const statusResponse=await getPaymentStatus(order_id);
+    const orderStatus=statusResponse?.status||"PENDING";
+
+    await Payment.update({paymentStatus:orderStatus},{where:{orderId:order_id}});
+
+    const payment=await Payment.findOne({where:{orderId:order_id}});
+    if (orderStatus==="SUCCESS") {
+      await User.update({isPremiumUser:true},{where:{id:payment.userId}});
+      return res.send("<script>alert('Transaction Successful'); window.location.href='/payment/success';</script>");
+    } else if (orderStatus==="FAILED") {
+      return res.send("<script>alert('TRANSACTION FAILED'); window.location.href='/payment/failed';</script>");
+    } else {
+      return res.send("<script>alert('Transaction Pending'); window.location.href='/payment/pending';</script>");
+    }
+
+  } catch (error) {
+    console.error("Error in payment callback:",error.message);
+    res.send("<script>alert('Error updating tarnsaction');</script>");    
+  }
+}
+
+
+//controller/premiumController.js
+const Expense=require("../models/expense");
+const User = require("../models/user");
+const {Sequelize}=require("sequelize");
+
+exports.getLeaderboard=async (req,res)=> {
+    try {
+        const leadeboardData=await User.findAll({
+            attributes:["name","totalExpense"],
+            include:[
+                {
+                    model:Expense,
+                    attributes:[]
+                }
+            ],
+            group:["User.id"],
+            order:[
+                [Sequelize.literal("totalExpense"),"DESC"]
+            ]
+        })
+        
+        res.status(200).json(leadeboardData);
+    } catch (error) {
+        console.error("Error fetching leaderboard:",error.message);
+        res.status(500).json({message:error.message});
+    }
+}
+
+
+//controller/userController.js
+const User=require('../models/user');
+const bcrypt=require('bcrypt');
+
+const userSignup=async (req, res)=> {
+    const {name,email,password}=req.body;
+    try {
+        const existingUser=await User.findOne({where: {email}});
+        if (existingUser) {
+            res.status(409).json({message: "User already exists"});
+            return;
+        }
+        
+        const hashedPassword=await bcrypt.hash(password, 10);
+        
+        await User.create({name,email, password:hashedPassword});
+        
+        return res.status(201).json({message: "Signup successful"});
+
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
+}
+
+const userLogin=async (req, res)=> {
+    const {email, password}=req.body;
+    try {
+        const user=await User.findOne({where: {email}});
+        if (user) {
+            bcrypt.compare(password, user.password, (err, result)=> {
+                if (err) {
+                    res.status(500).json({success: false, message: 'Something went wrong'});
+                }
+                if (result===true) {
+                    res.status(200).json({success:true, message: "User logged in successfully", userId:user.id});
+                } else {
+                    return res.status(400).json({success: false, message: "Password is incorrect"});
+                }
+            })
+        } else {
+            return res.status(404).json({message: "User not found"});
+        }
+    } catch (error) {
+        return res.status(500).send({message:error, success:false});
+    }
+}
+
+const getUserById = async (req,res)=> {
+    try {
+        const {id}=req.params;
+        const user=await User.findByPk(id);
+        if (!user) return res.status(404).json({message:"User not found"});
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({message:error.message});
+    }
+}
+
+module.exports={
+    userSignup,
+    userLogin,
+    getUserById
+}
+
+
+//models/expense.js
+const {DataTypes}=require('sequelize');
+const sequelize=require('../utils/db-connection');
+const User=require('./user');
+
+const Expense=sequelize.define('Expense', {
+    amount: {
+        type: DataTypes.INTEGER,
+        allowNull:false
+    },
+    description: {
+        type: DataTypes.STRING,
+        allowNull:false
+    },
+    category:{
+        type: DataTypes.STRING,
+        allowNull:false
+    },
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull:false
+    }
+},{
+    timestamps:true
+})
+
+User.hasMany (Expense, {foreignKey: 'userId'});
+Expense.belongsTo(User, {foreignKey: 'userId'});
+
+module.exports=Expense;
+
+
+//models/payment.js
+const {DataTypes}=require("sequelize");
+const sequelize=require("../utils/db-connection");
+
+const Payment=sequelize.define("Payment",{
+    orderId:{
+        type:DataTypes.STRING,
+        allowNull:false,
+        unique:true
+    },
+    paymentSessionId:{
+        type:DataTypes.STRING,
+        allowNull:false
+    },
+    orderAmount:{
+        type:DataTypes.INTEGER,
+        allowNull:false
+    },
+    orderCurrency:{
+        type:DataTypes.STRING,
+        defaultValue:"INR"
+    },
+    paymentStatus:{
+        type:DataTypes.STRING,
+        defaultValue:"Pending"
+    },
+    userId:{
+        type:DataTypes.INTEGER,
+        allowNull:true
+    }
+},{
+    timestamps:true
+})
+
+module.exports=Payment;
+
+
+//models/user.js
+const {DataTypes}=require('sequelize');
+const sequelize=require('../utils/db-connection');
+
+const User=sequelize.define('User',{
+    name:{
+        type: DataTypes.STRING,
+        allowNull:false
+    },
+    email:{
+        type: DataTypes.STRING,
+        allowNull:false,
+        unique:true,
+    },
+    password:{
+        type: DataTypes.STRING,
+        allowNull:false
+    },
+    isPremiumUser:{
+        type:DataTypes.BOOLEAN,
+        defaultValue:false
+    },
+    totalExpense:{
+        type:DataTypes.INTEGER,
+        allowNull:false,
+        defaultValue:0
+    }
+},{
+    timestamps:false
+})
+
+module.exports=User;
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Expense Tracker</title>
+</head>
+<body>
+    <h2 id="premiumHeader" style="display: none">
+        You are a premium user
+        <button id="showLeaderboardBtn">Show Leaderboard</button>
+    </h2>
+
+    <form onsubmit="addExpense(event)">
+        <label for="amount">Choose Expense Amount (Rs.):</label>
+        <input type="number" name="amount" required>
+        <label for="description">Choose description: </label>
+        <input type="text" name="description" required>
+        <label for="category">Choose a category:</label>
+        <select name="category" required>
+            <option value="Food">Food</option>
+            <option value="Shoping">Shoping</option>
+            <option value="Fuel">Fuel</option>
+            <option value="Others">Others</option>
+        </select>
+        <button>Add Expense</button>
+    </form>
+
+    <h3 style="font-weight: bold; margin-top: 20px;">Expenses</h3>
+    
+    <ul id="expenseList"></ul>
+
+    <div id="leaderboardSection", style="margin-top: 30px;"></div>
+
+    <button id="buyPremiumBtn">Buy Premium Membership</button>
+
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="./expense_script.js"></script>
+</body>
+</html>
+
+
+//public/expense_script.js
+function addExpense(e) {
+    e.preventDefault();
+    
+    const expense={
+        amount:parseInt(e.target.amount.value),
+        description:e.target.description.value,
+        category:e.target.category.value,
+        userId:localStorage.getItem("userId")
+    }
+    
+    axios.post('http://localhost:3000/expense', expense).then(res=> {
+        showExpenseOnScreen(res.data);
+        e.target.reset();
+    }).catch(err=> {
+        alert("Error adding expense: "+err.message);
+    })
+}
+
+function showExpenseOnScreen(expense) {
+    const parent=document.getElementById('expenseList');
+    const li=document.createElement('li');
+    li.textContent=`${expense.amount} - ${expense.description} - ${expense.category}`;
+    
+    const deleteBtn=document.createElement('button');
+    deleteBtn.textContent='Delete';
+    deleteBtn.onclick=()=> {
+        axios.delete(`http://localhost:3000/expense/${expense.id}`).then(()=> {
+            li.remove();
+        }).catch(err=> {
+            console.log("Error deleting expense:",err);
+            alert("Error deleting expense");
+        })
+    }
+    
+    li.appendChild(deleteBtn);
+    parent.appendChild(li);
+}
+
+const cashfree = Cashfree({
+    mode: "sandbox"
+});
+
+async function checkPremiumStatus() {
+    const userId=localStorage.getItem("userId");
+    if (!userId) return;
+
+    try {
+        const res=await axios.get(`http://localhost:3000/user/${userId}`);
+        const user=res.data;
+
+        if (user.isPremiumUser) {
+            showPremiumFeatures();
+        } else {
+            showNonPremiumFeatures();
+        }
+    } catch (error) {
+        console.error("Error checking premium status:",error.message);
+    }
+}
+
+function showPremiumFeatures() {
+    document.getElementById("premiumHeader").style.display="block";
+    document.getElementById("buyPremiumBtn").style.display="none";
+}
+
+function showNonPremiumFeatures() {
+    document.getElementById("premiumHeader").style.display="none";
+    document.getElementById("buyPremiumBtn").style.display="block";
+}
+
+document.getElementById("buyPremiumBtn").addEventListener("click", async () => {
+    try {
+        const userId=localStorage.getItem("userId");
+        const response=await axios.post('http://localhost:3000/process-payment',{userId});
+
+        const {paymentSessionId}=response.data;
+
+        let checkoutOptions = {
+            paymentSessionId,
+            redirectTarget: "_self",
+        };
+                
+        cashfree.checkout(checkoutOptions);
+    } catch (error) {
+        console.error("Error creating payment session:",error);
+    }
+});
+
+document.getElementById("showLeaderboardBtn").addEventListener("click",async ()=> {
+    try {
+        const response=await axios.get("http://localhost:3000/premium/showleaderboard");
+        const leaderboardData=response.data;
+
+        const leaderboardSection=document.getElementById("leaderboardSection");
+        leaderboardSection.innerHTML="<h3>Leaderboard</h3>";
+
+        const list=document.createElement("ul");
+        leaderboardData.forEach((user)=> {
+            const li=document.createElement("li");
+            li.textContent=`Name: ${user.name} - Total Expense: ${user.totalExpense}`;
+            list.appendChild(li);
+        })
+
+        leaderboardSection.appendChild(list);
+    } catch (error) {
+        console.error("Error fetching leaderboard:",error.message);
+    }
+})
+
+window.addEventListener('DOMContentLoaded', async ()=> {
+    const userId=localStorage.getItem("userId");
+    if (!userId) return;
+
+    await checkPremiumStatus();
+
+    axios.get(`http://localhost:3000/expenses?userId=${userId}`)
+        .then(res=> {
+            res.data.forEach(exp => {
+                showExpenseOnScreen(exp)
+            });
+        }).catch(err=> {
+            console.log("Error loading expenses: ", err);
+        })
+})
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+</head>
+<body>
+    <form onsubmit="login(event)">
+        <label for="email">Enter your email: </label>
+        <input type="text" name="email" required>
+        <label for="password">Password: </label>
+        <input type="text" name="password" required>
+        <button>Login</button>
+    </form>
+    <a href="./signup_screen.html">New User - Signup Now</a>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="./login.js"></script>
+</body>
+</html>
+
+
+//public/login.js
+function login(e) {
+    e.preventDefault();
+    console.log(e.target.name);
+    
+    const loginDetails={
+        email:e.target.email.value,
+        password:e.target.password.value
+    }
+    
+    console.log(loginDetails);
+    axios.post('http://localhost:3000/user/login', loginDetails).then(response => {
+        alert(response.data.message);
+        localStorage.setItem("userId", response.data.userId);
+        window.location.href="expense_screen.html";
+    }).catch(err=> {
+        console.log(JSON.stringify(err));
+        alert(err.response.data.message);
+    });
+}
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignUp</title>
+</head>
+<body>
+    <form onsubmit="signup(event)">
+        <label for="name">Enter your name: </label>
+        <input type="text" name="name" required>
+        <label for="email">Enter your email: </label>
+        <input type="text" name="email" required>
+        <label for="password">Password: </label>
+        <input type="text" name="password" required>
+        <button>Signup</button>
+    </form>
+    <a href="./login_screen.html">Existing User Login</a>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="./signup.js"></script>
+</body>
+</html>
+
+
+//public/signup.js
+function signup(e) {
+    e.preventDefault();
+    
+    const signupDetails={
+        name:e.target.name.value,
+        email:e.target.email.value,
+        password:e.target.password.value
+    }
+    
+    console.log(signupDetails);
+    axios.post('http://localhost:3000/user/signup', signupDetails).then(response => {
+        alert(response.data.message, false);
+    }).catch(err=> {
+        console.log(JSON.stringify(err));
+        document.body.innerHTML+=`<div style="color:red;">${err.message}</div>`;
+    });
+}
+
+
+//routes/paymentRoutes.js
+const express=require('express');
+const router=express.Router();
+const { getPaymentPage, processPayment, getPaymentStatus, paymentCallback } = require('../controller/paymentController');
+
+router.get('/',getPaymentPage);
+router.post('/pay',processPayment);
+router.get('/payment-status/:paymentSessionId',getPaymentStatus);
+router.get('/callback',paymentCallback);
+
+module.exports=router;
+
+
+//routes/showleaderboard.js
+const express=require('express');
+const router=express.Router();
+
+const {getLeaderboard}=require('../controller/premiumController');
+
+router.get('/showleaderboard',getLeaderboard);
+
+module.exports=router;
+
+
+//services/cashfreeServices.js
+const { Cashfree, CFEnvironment } = require("cashfree-pg");
+
+const cashfree = new Cashfree(CFEnvironment.SANDBOX, "TEST1075385095e6e8966f57aa6fee1505835701", "cfsk_ma_test_637b22e043be78ee316f7015287c169e_37ca2fe6");
+
+exports.createOrder = async (
+  orderId,
+  orderAmount,
+  orderCurrency="INR",
+  customerID,
+  customerPhone
+) => {
+  try {
+    const expiryDate=new Date(Date.now()+60*60*1000);
+    const formattedExpiryDate=expiryDate.toISOString();
+
+    const request = {
+      order_amount: orderAmount,
+      order_currency: orderCurrency,
+      order_id: orderId,
+
+      customer_details: {
+        customer_id: customerID,
+        customer_name:"Ganesh Kumar K",
+        customer_email:"kumarhcem@gmail.com",
+        customer_phone: "9597559831"
+      },
+
+      order_meta: {
+        return_url: "http://localhost:3000/payment/callback?order_id={order_id}",
+        notify_url: "http://localhost:3000/payment/callback",
+        payment_methods: "cc,dc,upi"
+      },
+
+      order_expiry_time: formattedExpiryDate,
+    };
+
+    const response = await cashfree.PGCreateOrder(request);
+    const paymentSessionId = response.data.payment_session_id;
+
+    return paymentSessionId;
+  } catch (error) {
+    console.error('Error:', error.response.data.message);
+  }
+};
+
+exports.getPaymentStatus = async (orderId) => {
+  try {
+    const response = await cashfree.PGOrderFetchPayments(orderId);
+
+    let getOrderResponse=response.data;
+    let orderStatus="PENDING";
+
+    if (getOrderResponse.some((transaction) => transaction.payment_status === "SUCCESS")) {
+        orderStatus="SUCCESS";
+    } else if (getOrderResponse.some((transaction) => transaction.payment_status === "FAILED")) {
+        orderStatus="FAILED";
+    }
+
+    return { status: orderStatus, data: getOrderResponse };
+} catch (error) {
+    console.error("Error fetching payment status:", error.response.data.message);
+    return {status:"FAILED",data:[]};
+  }
+};
+
+
+//utils/db-connection.js
+const {Sequelize}=require('sequelize');
+
+const sequelize=new Sequelize('expense_db', 'root', '130702', {
+    host: 'localhost',
+    dialect: 'mysql'
+});
+
+(async ()=> {
+    try {
+        await sequelize.authenticate();
+        console.log("Sequelize connected to MySQL");
+    } catch (error) {
+        console.log("Sequelize connection failed:", error.message);
+    }
+})();
+
+module.exports=sequelize;
+
+
+//user_form.js
+const express=require('express');
+const path=require('path');
+const app=express();
+const sequelize=require('./utils/db-connection');
+const {userSignup, userLogin, getUserById}=require('./controller/userController');
+const {addExpense, getExpenses, deleteExpense}=require('./controller/expenseController');
+const {processPayment}=require('./controller/paymentController');
+const paymentRoutes=require('./routes/paymentRoutes');
+const showLeaderboardRoutes=require('./routes/showleaderboard');
+
+app.use(express.urlencoded({extended:true}));
+app.use(express.json());
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/payment',paymentRoutes);
+
+app.use('/premium',showLeaderboardRoutes);
+
+app.get('/',(req, res)=> {
+    res.sendFile(path.join(__dirname, 'public', 'signup_screen.html'));
+})
+
+app.get('/login', (req, res)=> {
+    res.sendFile(path.join(__dirname, 'public', 'login_screen.html'));
+})
+
+app.get('/user/:id',getUserById);
+
+app.post('/user/signup', userSignup);
+app.post('/user/login', userLogin);
+
+app.post('/expense', addExpense);
+app.get('/expenses', getExpenses);
+
+app.post('/process-payment', processPayment);
+
+app.delete('/expense/:id', deleteExpense);
+
+sequelize.sync({alter:true}).then(()=> {
+    app.listen(3000, ()=> {
+        console.log("Server is running");
+    })
+}).catch((err)=> {
+    console.log('DB Sync failed:',err.message);
+})
+
+
